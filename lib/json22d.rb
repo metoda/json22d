@@ -5,7 +5,7 @@ require "active_support/inflector"
 module JSON22d
   extend self
 
-  VERSION = "0.1"
+  VERSION = "0.2"
 
   def run(arr, config)
     arr = arr.to_json unless arr.is_a?(String)
@@ -213,7 +213,7 @@ module JSON22d
   end
 
   def sprintf(value)
-    if !value.respond_to?(:strftime) ||
+    if !value.respond_to?(:strftime) &&
        value !~ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/
       return value
     end
