@@ -5,7 +5,7 @@ require "active_support/inflector"
 module JSON22d
   extend self
 
-  VERSION = "0.2"
+  VERSION = "0.5"
 
   def run(arr, config)
     arr = arr.to_json unless arr.is_a?(String)
@@ -33,10 +33,10 @@ module JSON22d
       if no_n
         max_n = values.reduce(0) do |acc, v|
           v = yield(v) if block_given?
-          sub_hash = v[key]
+          sub_hash = v&.[](key)
           if sub_hash.is_a?(Array)
             acc = sub_hash.count if acc < sub_hash.count
-          else
+          elsif !sub_hash.nil?
             acc = 1 if acc < 1
           end
           next acc
@@ -47,7 +47,7 @@ module JSON22d
       end
       fill_blanks(values.map do |v|
         v = yield(v) if block_given?
-        comment ? v : v[key]
+        comment ? v : v&.[](key)
       end, value)
     end
   end
@@ -138,14 +138,14 @@ module JSON22d
           match(/^(#)?([^\[(\s]+)(\[(\d+)\]|\(([^\)]+)\))?( SHIFT)?( UNSHIFT)?$/)&.
           captures
         key, op = key.split(".")
-        sub_hash = hash[key]
+        sub_hash = hash&.[](key)
         if comment
           acc + slice(hash, value)
         elsif n2 && sub_hash
           next acc << sub_hash.
             reduce([]) { |a, h| a + slice(h, value) }.
             join(n2)
-        elsif n && sub_hash
+        elsif n && (sub_hash || n.to_i == 0)
           next acc + n.to_i.times.map { |i| sub_hash[i] }.
             reduce([]) { |a, h| a + slice(h, value) }
         elsif sub_hash.is_a?(Array)
@@ -156,8 +156,7 @@ module JSON22d
               (closures.nil? ? [] : [i]) + slice(h, value)
             end.reduce(nil, &with_op(op))
         else
-          # [1] is the "pos" column
-          next acc + (closures.nil? ? [] : [1]) + slice(sub_hash, value)
+          next acc + slice(sub_hash, value)
         end
       else
         if hash.nil?
