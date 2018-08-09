@@ -141,6 +141,31 @@ describe "JSON22d" do
     end
   end
 
+  describe "selects first not-nil from two field results" do
+    before do
+      @arr = [{"i": "bar", "j": "foo"}]
+      @config = %w(i|j)
+    end
+
+    it "sets the correct header" do
+      header = JSON22d.run(@arr, @config).next
+      assert_equal ["i|j"], header
+    end
+
+    it "extracts the first of two fields" do
+      enum = JSON22d.run(@arr, @config)
+      enum.next # throw away header
+      assert_equal ["bar"], enum.next
+    end
+
+    it "extracts the second of two fields" do
+      @arr.first.delete(:i)
+      enum = JSON22d.run(@arr, @config)
+      enum.next # throw away header
+      assert_equal ["foo"], enum.next
+    end
+  end
+
   describe "joins multiple values within subarrays with given delim" do
     before do
       @arr = [{"i": ["bar", "blubb"]}, {"i": ["foo"]}]

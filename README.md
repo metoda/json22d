@@ -90,6 +90,14 @@ the join is a space and cannot be changed.
   => [["c.i"], ["foo bar"]]
 ```
 
+### Field alternation
+
+When using this, the first not-nil field is taken.
+```ruby
+  JSON22d.run([{"c": {"i": nil, "j": "bar"}}], [{"c": ["i|j"]}]).to_a
+  => [["c.i|j"], ["bar"]]
+```
+
 ### Field reduction
 
 A key leading to an array can be also joined into a single field using a custom
@@ -183,7 +191,7 @@ possible to rename on the fly while transforming the data.
   => [["i", "zomg"], ["bar", "foo"]]
 ```
 
-### Aggrgation of lists
+### Aggregation of lists
 
 Currently there is support for the functions **min**, **max** and **first**
 which can be applied to lists of structures.

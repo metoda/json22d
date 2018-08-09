@@ -5,7 +5,7 @@ require "active_support/inflector"
 module JSON22d
   extend self
 
-  VERSION = "0.5"
+  VERSION = "0.6"
 
   def run(arr, config)
     arr = arr.to_json unless arr.is_a?(String)
@@ -173,6 +173,8 @@ module JSON22d
           end
           if name.include?("+")
             next acc << name.split("+").map { |k| hash[k] }.compact.join(" ")
+          elsif name.include?("|")
+            next acc << hash[name.split("|").detect { |k| hash[k] }]
           elsif n && sub_array.is_a?(Array)
             next acc << sub_array.join(n)
           else
