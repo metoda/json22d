@@ -14,5 +14,6 @@ Gem::Specification.new do |s|
   s.files = Dir["lib/**/*"]
   s.test_files = Dir["spec/**/*"]
   s.add_dependency "activesupport", " > 3"
+  s.add_dependency "oj"
   s.add_development_dependency "minitest", "~> 5"
 end
