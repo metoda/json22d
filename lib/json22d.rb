@@ -2,10 +2,12 @@
 require "json"
 require "active_support/inflector"
 
-version="0.7"
+
 
 module JSON22d
   extend self
+
+  version="0.7"
 
   def run(arr, config)
     arr = Oj.generate(arr) unless arr.is_a?(String)
