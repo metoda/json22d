@@ -2,16 +2,16 @@
 require "json"
 require "active_support/inflector"
 
+version="0.7"
+
 module JSON22d
   extend self
 
-  VERSION = "0.6"
-
   def run(arr, config)
-    arr = arr.to_json unless arr.is_a?(String)
+    arr = Oj.generate(arr) unless arr.is_a?(String)
     arr = JSON.parse(arr)
     fill_blanks(arr, config, &(block_given? ? Proc.new : nil))
-    return Enumerator.new do |y|
+    Enumerator.new do |y|
       y << header(config)
       arr.each do |h|
         row(block_given? ? yield(h) : h, config).each { |r| y << r }
@@ -35,7 +35,7 @@ module JSON22d
           v = yield(v) if block_given?
           sub_hash = v&.[](key)
           if sub_hash.is_a?(Array)
-            acc = sub_hash.count if acc < sub_hash.count
+            acc = sub_hash.size if acc < sub_hash.size
           elsif !sub_hash.nil?
             acc = 1 if acc < 1
           end
@@ -53,65 +53,76 @@ module JSON22d
   end
 
   def header(config)
-    return config.reduce([]) do |acc, name|
-      if name.is_a?(Hash)
-        key, value = name.first
-        comment, key, closures, n, n2, shift, unshift = key.to_s.
-          match(/^(#)?([^\[(\s]+)(\[(\d+)\]|\(([^\)]+)\))?( SHIFT)?( UNSHIFT)?$/)&.
-          captures
-        key, op = key.split(".")
-        key = key.singularize
-        if comment
-          acc + header(value).map { |m| "#{key}.#{m}" }
-        elsif n
-          next acc + n.to_i.times.reduce([]) do |a, i|
-            a + header(value).map do |m|
-              if shift
-                "#{key}[#{i}]#{m.match(/^[^(\[\s\.]+(.*)$/)&.captures&.first}"
-              elsif unshift
-                "#{m}[#{i}]"
-              elsif op
-                "#{key}.#{op}_#{m}"
-              else
-                "#{key}[#{i}].#{m}"
-              end
-            end
-          end
-        elsif closures.nil? || n2
-          next acc + header(value).map do |m|
-            if shift
-              "#{key}#{m.match(/^[^(\[\s\.]+(.*)$/)&.captures&.first}"
-            elsif unshift
-              "#{m}"
-            elsif op
-              "#{key}.#{op}_#{m}"
-            else
-              "#{key}.#{m}"
-            end
-          end
-        else
-          # "pos" is the column for determining i.e. offer position in a product
-          next acc + (["pos"] + header(value)).map do |m|
-            if shift
-              "#{key}#{m.match(/^[^(\[\s\.]+(.*)$/)&.captures&.first}"
-            elsif unshift
-              "#{m}"
-            elsif op
-              "#{key}.#{op}_#{m}"
-            else
-              "#{key}.#{m}"
-            end
-          end
-        end
-      elsif name.is_a?(Array)
-        _key, title = name
-        next acc << title.to_s
-      else
-        name, *_ = name.to_s.match(/^([^(]+)(\(([^\)]+)\))?$/)&.captures
-        name = name.match(/^([^+]+)/).captures.first
-        next acc << name.to_s
-      end
+    config.each_with_object([]) do |item, acc|
+      process_config_item(item, acc)
     end
+  end
+  
+  def process_config_item(item, acc)
+    case item
+    when Hash
+      key, value = item.first
+      process_hash_item(key, value, acc)
+    when Array
+      _, title = item
+      acc << title.to_s
+    else
+      process_string_item(item, acc)
+    end
+  end
+  
+  def process_hash_item(key, value, acc)
+    comment, key, closures, n, n2, shift, unshift, op = extract_hash_item_details(key)
+    key = key.singularize
+  
+    if comment
+      acc.concat(header(value).map { |m| "#{key}.#{m}" })
+    else
+      generate_header_for_hash_item(key, value, closures, n, n2, shift, unshift, op, acc)
+    end
+  end
+  
+  def extract_hash_item_details(key)
+    key.to_s.match(/^(#)?([^\[(\s]+)(\[(\d+)\]|\(([^\)]+)\))?( SHIFT)?( UNSHIFT)?(\.\w+)?$/).captures
+  end
+  
+  def generate_header_for_hash_item(key, value, closures, n, n2, shift, unshift, op, acc)
+    if n
+      n.to_i.times do |i|
+        acc.concat(header(value).map { |m| format_header_with_index(key, m, i, shift, unshift, op) })
+      end
+    elsif closures.nil? || n2
+      acc.concat(header(value).map { |m| format_header_without_index(key, m, shift, unshift, op) })
+    end
+  end
+  
+  def format_header_with_index(key, header, index, shift, unshift, op)
+    if shift
+      "#{key}[#{index}]#{header.split('.', 2).last}"
+    elsif unshift
+      "#{header}[#{index}]"
+    elsif op
+      "#{key}.#{op.split('.').last}_#{header}"
+    else
+      "#{key}[#{index}].#{header}"
+    end
+  end
+  
+  def format_header_without_index(key, header, shift, unshift, op)
+    if shift
+      "#{key}#{header.split('.', 2).last}"
+    elsif unshift
+      "#{header}"
+    elsif op
+      "#{key}.#{op.split('.').last}_#{header}"
+    else
+      "#{key}.#{header}"
+    end
+  end
+  
+  def process_string_item(item, acc)
+    name = item.to_s.split('(', 2).first.split('+', 2).first.strip
+    acc << name
   end
 
   def row(hash, config)
